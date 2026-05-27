@@ -191,7 +191,7 @@
         const container = document.getElementById('toastPlacement');
         const color = tipo === 'success' ? 'bg-success' : tipo === 'warning' ? 'bg-warning text-dark' : 'bg-danger';
         const toastId = 'toast' + Date.now();
-        const URL_DE_GOOGLE = "https://script.google.com/macros/s/AKfycbz2OpdD6V6IwUIITIQKWpBOsjtnVlhCRBPzJQH-QOnMkyS1pgqaO7Wg86NILZIV6ONV/exec";
+        container.innerHTML += `<div id="${toastId}" class="toast align-items-center text-white ${color} border-0 show" role="alert"><div class="d-flex"><div class="toast-body fw-bold">${mensaje}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`;
         setTimeout(() => { if(document.getElementById(toastId)) document.getElementById(toastId).remove(); }, 3500);
     }
 
@@ -316,12 +316,8 @@
             tablaFilasHtml = `<tr><td colspan="7" style="text-align:center; color:#999;">No existen transacciones en este periodo.</td></tr>`;
         }
 
-        // ⚠️ REEMPLAZA EL CONTENIDO DE LAS COMILLAS CON TU ENLACE /exec DE GOOGLE APPS SCRIPT
-        const URL_DE_GOOGLE = "AQUÍ_PEGA_TU_LINK_EXEC_DE_GOOGLE"; 
-
-        if(URL_DE_GOOGLE === "AQUÍ_PEGA_TU_LINK_EXEC_DE_GOOGLE") {
-            return alert("Por favor, edita este archivo en GitHub y pega tu enlace real de Google Apps Script.");
-        }
+        // Enlace de producción de Google Apps Script ya inyectado correctamente
+        const URL_DE_GOOGLE = "https://script.google.com/macros/s/AKfycbz2OpdD6V6IwUIITIQKWpBOsjtnVlhCRBPzJQH-QOnMkyS1pgqaO7Wg86NILZIV6ONV/exec"; 
 
         showNotify("Generando archivo PDF y comunicando con el servidor...", "warning");
 
