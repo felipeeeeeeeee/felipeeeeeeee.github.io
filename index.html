@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { background-color: #f1f4f9; font-family: 'Segoe UI', sans-serif; }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .stat-card { border-top: 4px solid #0d6efd; }
+        .stat-card.danger { border-top-color: #dc3545; }
+        .btn-vender { background-color: #198754; color: white; border: none; padding: 2px 10px; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 15px; display: none; background: white; }
+        .search-box { position: relative; }
+        .search-box i { position: absolute; left: 12px; top: 10px; color: #aaa; }
+        .search-box input { padding-left: 35px; border-radius: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastPlacement"></div>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold m-0 text-dark"><i class="bi bi-bag-check-fill text-primary"></i> EmprendeStyle POS</h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-dark btn-sm fw-bold" onclick="toggleScanner()">
+                <i class="bi bi-upc-scan"></i> ESCANEAR CÓDIGO
+            </button>
+            <button class="btn btn-outline-danger btn-sm fw-bold" onclick="resetSystem()">
+                <i class="bi bi-trash3-fill"></i> BORRAR TODO
+            </button>
+        </div>
+    </div>
+
+    <div id="reader" class="card p-2 text-center border border-primary"></div>
+
+    <div class="row mb-4">
+        <div class="col-md-3"><div class="card p-3 text-center stat-card"><h6>INGRESOS (IVA)</h6><h3 id="stat-ingresos" class="text-success fw-bold">$0</h3></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center stat-card"><h6>VENTAS PERIODO</h6><h3 id="stat-ventas">0</h3></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center stat-card"><h6>PRODUCTOS</h6><h4 id="stat-productos">0</h4></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center stat-card danger"><h6>BAJO STOCK</h6><h3 id="stat-alerta" class="text-danger">0</h3></div></div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card p-4">
+                <h5 class="fw-bold mb-3 text-primary"><i class="bi bi-plus-circle"></i> Nuevo Producto</h5>
+                <form id="pos-form">
+                    <input type="text" id="p-code" class="form-control mb-2" placeholder="Código de Barras / SKU" required>
+                    <input type="text" id="p-name" class="form-control mb-2" placeholder="Nombre Producto" required>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><input type="number" id="p-price" class="form-control" placeholder="Precio Neto" required></div>
+                        <div class="col-6"><input type="number" id="p-stock" class="form-control" placeholder="Stock" required></div>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 fw-bold">Registrar / Actualizar</button>
+                </form>
+                <hr>
+                <div class="mt-2">
+                    <label class="small text-muted">Configurar Email de Reporte:</label>
+                    <input type="email" id="target-email" class="form-control form-control-sm mb-2" placeholder="escalandoideas@gmail.com">
+                    <button class="btn btn-primary btn-sm w-100" onclick="sendDailyReport()">
+                        <i class="bi bi-envelope-at"></i> Enviar Reporte PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h5 class="fw-bold m-0"><i class="bi bi-clipboard-data"></i> Inventario y Abastecimiento</h5>
+                    <div class="search-box">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="pos-search" class="form-control form-control-sm" placeholder="Buscar por código o nombre..." oninput="render()">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr class="small"><th>SKU</th><th>PRODUCTO</th><th>NETO</th><th>TOTAL+IVA</th><th>STOCK</th><th class="text-center">GESTIÓN</th></tr>
+                        </thead>
+                        <tbody id="inventory-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+            <h5 class="fw-bold m-0"><i class="bi bi-calendar-range"></i> Registro de Ventas por Periodo</h5>
+            <div class="d-flex gap-2 align-items-center mt-2 mt-md-0">
+                <span class="small text-muted">Desde:</span>
+                <input type="date" id="filter-from" class="form-control form-control-sm" onchange="render()">
+                <span class="small text-muted">Hasta:</span>
+                <input type="date" id="filter-to" class="form-control form-control-sm" onchange="render()">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr><th>Fecha y Hora</th><th>Código</th><th>Producto</th><th>Cant.</th><th>Total</th><th class="text-center">Acción</th></tr>
+                </thead>
+                <tbody id="history-table"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const IVA_VAL = 0.19;
+    const CLAVE_AUTORIZACION = "1234";
+    let inventory = JSON.parse(localStorage.getItem('es_pos_inv')) || [];
+    let history = JSON.parse(localStorage.getItem('es_pos_hist')) || [];
+    document.getElementById('target-email').value = localStorage.getItem('es_pref_email') || "";
+
+    // --- ESCÁNER CON FORZADO NATIVO ---
+    let html5QrCode;
+    let scannerActivo = false;
+
+    function toggleScanner() {
+        const readerDiv = document.getElementById('reader');
+        
+        if (!scannerActivo) {
+            readerDiv.style.display = 'block';
+            
+            // PASO 1: Forzar al navegador del celular a pedir la cámara de forma nativa
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then((stream) => {
+                // Apagamos el stream de prueba para transferirle el control a la librería
+                stream.getTracks().forEach(track => track.stop());
+                
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                }
+                
+                const config = { fps: 15, qrbox: { width: 280, height: 130 } };
+                
+                // PASO 2: Iniciar el escaneo de códigos de barra
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (decodedText) => {
+                        const cleanCode = decodedText.trim();
+                        const idx = inventory.findIndex(p => p.code.trim() == cleanCode);
+                        
+                        if(idx !== -1) {
+                            makeSale(idx);
+                        } else {
+                            document.getElementById('p-code').value = cleanCode;
+                            showNotify("Código de barras copiado", "warning");
+                        }
+                        apagarEscaner();
+                    }
+                ).then(() => {
+                    scannerActivo = true;
+                }).catch(err => {
+                    alert("Error al iniciar escáner gráfico: " + err);
+                    readerDiv.style.display = 'none';
+                });
+            })
+            .catch(err => {
+                // Si el iframe de Google bloquea la cámara por completo, saldrá este mensaje:
+                alert("Bloqueo de Seguridad del Teléfono: Tu celular no permite abrir la cámara dentro de páginas de Google Apps Script. Error: " + err);
+                readerDiv.style.display = 'none';
+            });
+            
+        } else {
+            apagarEscaner();
+        }
+    }
+
+    function apagarEscaner() {
+        const readerDiv = document.getElementById('reader');
+        if (html5QrCode && scannerActivo) {
+            html5QrCode.stop().then(() => {
+                readerDiv.style.display = 'none';
+                scannerActivo = false;
+            }).catch(err => {
+                readerDiv.style.display = 'none';
+                scannerActivo = false;
+            });
+        } else {
+            readerDiv.style.display = 'none';
+            scannerActivo = false;
+        }
+    }
+
+    // --- NOTIFICACIONES ---
+    function showNotify(mensaje, tipo = 'info') {
+        const container = document.getElementById('toastPlacement');
+        const color = tipo === 'success' ? 'bg-success' : tipo === 'warning' ? 'bg-warning text-dark' : 'bg-danger';
+        const toastId = 'toast' + Date.now();
+        container.innerHTML += `<div id="${toastId}" class="toast align-items-center text-white ${color} border-0 show" role="alert"><div class="d-flex"><div class="toast-body fw-bold">${mensaje}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`;
+        setTimeout(() => { if(document.getElementById(toastId)) document.getElementById(toastId).remove(); }, 3500);
+    }
+
+    document.getElementById('pos-form').onsubmit = (e) => {
+        e.preventDefault();
+        const codeInput = document.getElementById('p-code').value.trim();
+        const nameInput = document.getElementById('p-name').value;
+        const priceInput = parseFloat(document.getElementById('p-price').value);
+        const stockInput = parseInt(document.getElementById('p-stock').value);
+
+        const existingIdx = inventory.findIndex(p => p.code.trim() === codeInput);
+
+        if (existingIdx !== -1) {
+            inventory[existingIdx].name = nameInput;
+            inventory[existingIdx].price = priceInput;
+            inventory[existingIdx].stock += stockInput;
+            showNotify("Producto existente: ¡Stock actualizado!", "success");
+        } else {
+            inventory.push({
+                code: codeInput,
+                name: nameInput,
+                price: priceInput,
+                stock: stockInput
+            });
+            showNotify("Producto registrado con éxito", "success");
+        }
+
+        e.target.reset();
+        render();
+    };
+
+    function makeSale(index) {
+        if (inventory[index].stock > 0) {
+            inventory[index].stock--;
+            const netPrice = inventory[index].price;
+            const ivaAmount = netPrice * IVA_VAL;
+            const total = netPrice + ivaAmount;
+            const now = new Date();
+            
+            history.push({
+                id: Date.now(),
+                code: inventory[index].code,
+                name: inventory[index].name,
+                qty: 1,
+                neto: netPrice,
+                iva: ivaAmount,
+                total: total,
+                fullDate: now.toLocaleString(),
+                isoDate: now.toISOString().split('T')[0]
+            });
+            showNotify(`Venta: ${inventory[index].name}`, "success");
+
+            if (inventory[index].stock <= 5) {
+                showNotify(`⚠️ Stock crítico: Quedan ${inventory[index].stock} unidades de ${inventory[index].name}`, "warning");
+            }
+
+            render();
+        } else {
+            showNotify("⚠️ Sin stock", "danger");
+        }
+    }
+
+    function anularVenta(id) {
+        const pass = prompt("Ingrese clave (1234) para anular:");
+        if (pass === CLAVE_AUTORIZACION) {
+            const idx = history.findIndex(h => h.id === id);
+            if (idx !== -1) {
+                const pIdx = inventory.findIndex(p => p.code === history[idx].code);
+                if(pIdx !== -1) inventory[pIdx].stock++;
+                history.splice(idx, 1);
+                render();
+                showNotify("Venta annulada", "warning");
+            }
+        }
+    }
+
+    function resetSystem() {
+        const pass = prompt("⚠️ ¡ADVERTENCIA! Se borrará todo el inventario y ventas. Ingrese clave (1234):");
+        if (pass === "1234") {
+            localStorage.clear();
+            inventory = [];
+            history = [];
+            render();
+            showNotify("Sistema reiniciado con éxito", "danger");
+        } else if (pass !== null) {
+            alert("Clave incorrecta.");
+        }
+    }
+
+    function sendDailyReport() {
+        const email = document.getElementById('target-email').value;
+        if(!email) return alert("Escriba un correo");
+        localStorage.setItem('es_pref_email', email);
+
+        const from = document.getElementById('filter-from').value;
+        const to = document.getElementById('filter-to').value;
+        const periodoTxt = (from && to) ? `Del ${from} al ${to}` : "Historial Completo";
+
+        const filtered = history.filter(h => (!from || !to) || (h.isoDate >= from && h.isoDate <= to));
+        const totalR = filtered.reduce((s, h) => s + h.total, 0);
+        const totalC = filtered.reduce((s, h) => s + h.qty, 0);
+
+        let tablaFilasHtml = "";
+        filtered.forEach(h => {
+            const n = h.neto ? Math.round(h.neto) : Math.round(h.total / (1 + IVA_VAL));
+            const i = h.iva ? Math.round(h.iva) : Math.round(h.total - n);
+            const t = Math.round(h.total);
+            
+            tablaFilasHtml += `<tr>
+                <td>${h.fullDate}</td>
+                <td>${h.code}</td>
+                <td>${h.name}</td>
+                <td style="text-align:center;">${h.qty}</td>
+                <td style="text-align:right;">$${n.toLocaleString()}</td>
+                <td style="text-align:right;">$${i.toLocaleString()}</td>
+                <td style="text-align:right;"><b>$${t.toLocaleString()}</b></td>
+            </tr>`;
+        });
+
+        if (filtered.length === 0) {
+            tablaFilasHtml = `<tr><td colspan="7" style="text-align:center; color:#999;">No existen transacciones en este periodo.</td></tr>`;
+        }
+
+        google.script.run
+            .withSuccessHandler(res => showNotify(res, "success"))
+            .enviarReporteGmail(email, tablaFilasHtml, totalR, totalC, periodoTxt);
+    }
+
+    function render() {
+        const query = document.getElementById('pos-search').value.toLowerCase().trim();
+        const invTable = document.getElementById('inventory-table');
+        invTable.innerHTML = '';
+        
+        inventory.forEach((p, i) => {
+            if (query !== "" && !p.code.toLowerCase().includes(query) && !p.name.toLowerCase().includes(query)) {
+                return; 
+            }
+
+            invTable.innerHTML += `<tr>
+                <td><span class="badge bg-light text-dark">${p.code}</span></td>
+                <td class="fw-bold">${p.name}</td>
+                <td>$${Math.round(p.price).toLocaleString()}</td>
+                <td class="text-primary fw-bold">$${Math.round(p.price*(1+IVA_VAL)).toLocaleString()}</td>
+                <td><span class="badge ${p.stock < 5 ? 'bg-danger':'bg-success'}">${p.stock}</span></td>
+                <td class="text-center">
+                    <div class="btn-group border rounded">
+                        <button onclick="inventory[${i}].stock++; render();" class="btn btn-sm btn-light text-primary fw-bold">+</button>
+                        <button onclick="makeSale(${i})" class="btn btn-sm btn-vender fw-bold">Vender</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+
+        const from = document.getElementById('filter-from').value;
+        const to = document.getElementById('filter-to').value;
+        const histTable = document.getElementById('history-table');
+        histTable.innerHTML = '';
+        
+        let filtered = history.filter(h => (!from || !to) || (h.isoDate >= from && h.isoDate <= to));
+
+        filtered.slice().reverse().forEach(h => {
+            histTable.innerHTML += `<tr>
+                <td class="small">${h.fullDate}</td>
+                <td>${h.code}</td>
+                <td>${h.name}</td>
+                <td>${h.qty}</td>
+                <td class="fw-bold">$${Math.round(h.total).toLocaleString()}</td>
+                <td class="text-center"><a href="#" onclick="anularVenta(${h.id})" class="text-danger"><i class="bi bi-x-circle"></i></a></td>
+            </tr>`;
+        });
+
+        document.getElementById('stat-ingresos').innerText = `$${Math.round(filtered.reduce((s, h) => s + h.total, 0)).toLocaleString()}`;
+        document.getElementById('stat-ventas').innerText = filtered.length;
+        document.getElementById('stat-productos').innerText = inventory.length;
+        document.getElementById('stat-alerta').innerText = inventory.filter(p => p.stock < 5).length;
+
+        localStorage.setItem('es_pos_inv', JSON.stringify(inventory));
+        localStorage.setItem('es_pos_hist', JSON.stringify(history));
+    }
+    render();
+</script>
+</body>
+</html>
