@@ -128,10 +128,8 @@
         if (!scannerActivo) {
             readerDiv.style.display = 'block';
             
-            // PASO 1: Forzar al navegador del celular a pedir la cámara de forma nativa
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then((stream) => {
-                // Apagamos el stream de prueba para transferirle el control a la librería
                 stream.getTracks().forEach(track => track.stop());
                 
                 if (!html5QrCode) {
@@ -140,7 +138,6 @@
                 
                 const config = { fps: 15, qrbox: { width: 280, height: 130 } };
                 
-                // PASO 2: Iniciar el escaneo de códigos de barra
                 html5QrCode.start(
                     { facingMode: "environment" }, 
                     config, 
@@ -164,8 +161,7 @@
                 });
             })
             .catch(err => {
-                // Si el iframe de Google bloquea la cámara por completo, saldrá este mensaje:
-                alert("Bloqueo de Seguridad del Teléfono: Tu celular no permite abrir la cámara dentro de páginas de Google Apps Script. Error: " + err);
+                alert("Error de acceso al hardware: Asegúrate de otorgar permisos permanentes a la cámara. Detalles: " + err);
                 readerDiv.style.display = 'none';
             });
             
@@ -195,7 +191,7 @@
         const container = document.getElementById('toastPlacement');
         const color = tipo === 'success' ? 'bg-success' : tipo === 'warning' ? 'bg-warning text-dark' : 'bg-danger';
         const toastId = 'toast' + Date.now();
-        container.innerHTML += `<div id="${toastId}" class="toast align-items-center text-white ${color} border-0 show" role="alert"><div class="d-flex"><div class="toast-body fw-bold">${mensaje}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`;
+        const URL_DE_GOOGLE = "https://script.google.com/macros/s/AKfycbz2OpdD6V6IwUIITIQKWpBOsjtnVlhCRBPzJQH-QOnMkyS1pgqaO7Wg86NILZIV6ONV/exec";
         setTimeout(() => { if(document.getElementById(toastId)) document.getElementById(toastId).remove(); }, 3500);
     }
 
@@ -285,6 +281,7 @@
         }
     }
 
+    // --- ENVIAR REPORTE PUENTE (GITHUB -> GOOGLE WEB APP) ---
     function sendDailyReport() {
         const email = document.getElementById('target-email').value;
         if(!email) return alert("Escriba un correo");
@@ -319,9 +316,35 @@
             tablaFilasHtml = `<tr><td colspan="7" style="text-align:center; color:#999;">No existen transacciones en este periodo.</td></tr>`;
         }
 
-        google.script.run
-            .withSuccessHandler(res => showNotify(res, "success"))
-            .enviarReporteGmail(email, tablaFilasHtml, totalR, totalC, periodoTxt);
+        // ⚠️ REEMPLAZA EL CONTENIDO DE LAS COMILLAS CON TU ENLACE /exec DE GOOGLE APPS SCRIPT
+        const URL_DE_GOOGLE = "AQUÍ_PEGA_TU_LINK_EXEC_DE_GOOGLE"; 
+
+        if(URL_DE_GOOGLE === "AQUÍ_PEGA_TU_LINK_EXEC_DE_GOOGLE") {
+            return alert("Por favor, edita este archivo en GitHub y pega tu enlace real de Google Apps Script.");
+        }
+
+        showNotify("Generando archivo PDF y comunicando con el servidor...", "warning");
+
+        var datos = {
+            destinatario: email,
+            tabla: tablaFilasHtml,
+            totalR: totalR,
+            totalC: totalC,
+            periodo: periodoTxt
+        };
+
+        fetch(URL_DE_GOOGLE, {
+            method: "POST",
+            mode: "no-cors", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(datos)
+        })
+        .then(() => {
+            showNotify("📄 ¡Petición de PDF procesada! Revisa tu correo en breve.", "success");
+        })
+        .catch(err => {
+            alert("Error de comunicación: " + err);
+        });
     }
 
     function render() {
